@@ -41,9 +41,23 @@ app.post('/register',async (req,res)=>{
     fs.writeFileSync(jsonFile,JSON.stringify(data,null,2))
 })
 
-app.post('/login',(req,res)=>{
+app.post('/login',async (req,res)=>{
     const email = req.body.email;
     const password = req.body.password;
 
+    let data = []
 
+    if (fs.existsSync(jsonFile)){
+        const Users = fs.readFileSync(jsonFile,'utf8')
+        data = JSON.parse(Users)
+    }
+
+    const user = data.find(u => u.email === email)
+    if(!user) return res.status(400).json({message:"Email invalide !"})
+
+    
+    const validePassword = await bcrypt.compare(password,user.hashedPassword)
+    if(!validePassword) return res.status(400).json({message:"Mot de Passe invalide !"})
+
+    res.status(200).json({message:"vous etes connecté avec succés !"})
 })
