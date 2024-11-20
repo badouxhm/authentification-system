@@ -1,7 +1,10 @@
 const express = require('express');
 const bcrypt = require('bcryptjs')
 const bodyparser = require('body-parser')
+const mongoose = require('mongoose')
 const fs = require('fs');
+
+mongoose.connect('mongodb://localhost:27017/Auth-system')
 
 const app = express()
 
@@ -11,48 +14,42 @@ app.listen(3000,()=> {
     console.log("le serveur est sur le port 3000");
 })
 
-const jsonFile = './users.json';
+const userSchema = new mongoose.Schema({
+    email: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
+    hashedPassword: { type: String, required: true },
+  });
+
+const User = mongoose.model('User', userSchema);
 
 app.post('/register',async (req,res)=>{
     const email = req.body.email
     const name = req.body.name
     const password = req.body.password
 
-    //crypter le mot de passe 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = { email , name , hashedPassword }
-    
-
-    let data = []
-
-    if(fs.existsSync(jsonFile)){
-        const oldUsers = fs.readFileSync(jsonFile,'utf-8');
-        if(oldUsers) data = JSON.parse(oldUsers)
-    }
-    //checker si l'email existe deja 
-    const existEmail = data.find(user => user.email === email)
+    const existEmail = await User.findOne({email})
     if (existEmail){
         console.log("cet email est deja utilisé !")
         return res.status(400).json({message: "cet email est deja utilisé !"})
     }
-    //inserer  l'utilisateur dasn la liste puis inserer la liste dans le fichier JSON
-    data.push(user);
-    fs.writeFileSync(jsonFile,JSON.stringify(data,null,2))
+
+    const newUser = new User({email,name,hashedPassword})
+    try{
+        await newUser.save();
+        res.status(201).json({ message: "Utilisateur créé avec succès !" });
+    }catch (error) {
+        console.error("Erreur lors de l'inscription :", error);
+        res.status(500).json({ message: "Erreur, veuillez réessayer." });
+      }
 })
 
 app.post('/login',async (req,res)=>{
     const email = req.body.email;
     const password = req.body.password;
 
-    let data = []
-
-    if (fs.existsSync(jsonFile)){
-        const Users = fs.readFileSync(jsonFile,'utf8')
-        data = JSON.parse(Users)
-    }
-
-    const user = data.find(u => u.email === email)
+    const user = User.findOne({email})
     if(!user) return res.status(400).json({message:"Email invalide !"})
 
     
